@@ -102,7 +102,7 @@ public class Utente implements Serializable {
     }
 
     public void setMail(String mail) {
-        this.mail = mail;
+        this.mail = mail; //mail
     }
 
     
