@@ -104,10 +104,6 @@ public class Utente implements Serializable {
     public void setMail(String mail) {
         this.mail = mail; //mail
     }
-
-    
-   
-    
     
     public String getNome() {
         return nome;
@@ -122,7 +118,7 @@ public class Utente implements Serializable {
     }
 
     public void setCognome(String cognome) {
-        this.cognome = cognome;
+        this.cognome = cognome; //cognome
     }
 
 
