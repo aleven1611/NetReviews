@@ -81,7 +81,7 @@ public class WebSocket {
      */
     @OnOpen
     public void onOpen(Session session){
-        log.info(session.getId() + " has opened a connection"); 
+        log.info(session.getId() + " has opened a connection MAMMT FOTT"); 
         
         sessions.add(session);
     }
