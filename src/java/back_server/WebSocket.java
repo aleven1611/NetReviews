@@ -48,11 +48,14 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.List;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.inject.Inject;
+import javax.persistence.NoResultException;
 import javax.websocket.EncodeException;
 import javax.websocket.OnClose;
 import javax.websocket.OnMessage;
@@ -81,7 +84,7 @@ public class WebSocket {
      */
     @OnOpen
     public void onOpen(Session session){
-        log.info(session.getId() + " has opened a connection MAMMT FOTT"); 
+        log.info(session.getId() + " has opened a connection"); 
         
         sessions.add(session);
     }
@@ -93,53 +96,79 @@ public class WebSocket {
     @OnMessage
     public void onMessage(String message, Session session){
         log.info("Message from " + session.getId() + ": " + message);
-        
-            
-          /*  for (Session e: sessions){
-                    System.out.println("id: "+e.getId());
-                    
-                    try {
-                        e.getBasicRemote().sendText(message);
-                    }
-                    
-                    catch(IOException ex){
-                        ex.printStackTrace();
-                        log.info("l'utente con session "+session.getId()+" non risponde");
-                        onClose(session);
-                    }
-                    
-            }*/
-        
-        log.info("invio completato a tutti");
+
     }
  
     @OnMessage
     public void onMessage(byte[] buff, Session session){
-        
-        log.info("Message from " + session.getId() + ": nuovo messaggio");
-        
         ByteArrayInputStream bais = null;
         ObjectInputStream obj = null;
-        
-        
+        ByteArrayOutputStream baos = null;
+        ObjectOutputStream objout = null;
         try {
+            log.info("Message from " + session.getId() + ": nuovo messaggio");
             
             bais = new ByteArrayInputStream(buff);
             obj = new ObjectInputStream(bais);
-            ByteArrayOutputStream baos = null;
-            ObjectOutputStream objout = null;
-            
             Message msg = (Message) obj.readObject();
+            
+            if(msg.getType().equals("login")){
+                login(objout,baos,session,msg);
+            }
             
             if(msg.getType().equals("Commento")){
                 System.out.println("vedi: "+((Commenti) msg.getCorpo()).getCommento());
                 gr.addCommenti((Commenti) msg.getCorpo());
             }
-            
+                        
             if(msg.getType().equals("findCommenti")){
-               Vector<Commenti> list = (Vector<Commenti>) gr.findCommenti((long)msg.getCorpo());
+                try {
+                    findCommenti(objout,baos,session,msg);
+                } catch (IOException ex) {
+                    Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
+                }   finally{
+                    objout.close();
+                    baos.close();
+                }
+            }
+            
+        } catch (IOException | ClassNotFoundException ex) {
+            Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
+            
+        }           
+       }
+   
+        
+    @OnClose
+    public void onClose(Session session){
+        log.info("Session " +session.getId()+" has ended");
+        sessions.remove(session);
+    }
+    
+    
+    
+    public void login(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session, Message msg){
+        Utente ut=(Utente) msg.getCorpo();
+                log.info("l'utente:"+ut.getMail()+" sta tentando il login.");
+                
+                try {
+                    String pass=gr.findPass(ut.getMail());
+                    if(Login.validatePassword(ut.getPassword(),pass)){
+                        
+                       log.info("Login effettuato correttamente da: "+ut.getMail());
+                       send(objout,baos,session,new Message("ValidateLogin","Login effettuato!"));
+                    }
+                } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
+                    Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
+                } catch(NoResultException e){
+                    send(objout,baos,session,new Message("ErrLogin","User o password errati!"));
+                   
+                }
+    }
+    
+    public void findCommenti(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session, Message msg) throws IOException{
+        Vector<Commenti> list = (Vector<Commenti>) gr.findCommenti((long)msg.getCorpo());
                
-               try{
                baos = new ByteArrayOutputStream();
                objout = new ObjectOutputStream(baos);
 
@@ -151,57 +180,21 @@ public class WebSocket {
                session.getBasicRemote().sendBinary(bb);
                
                baos.flush();
-                
-               } catch (IOException e) {
-            e.printStackTrace();
+              
         }
-
-        finally{
-            try {
-                if (baos != null)
-                    baos.close();
-
-                if (objout != null)
-                    objout.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-        }
-
-        }
-                  
-                
-               }// fine find commenti
-            
+    
+    //per inviare un oggetto
+    public void send(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session,Message m){
+        try {
+            baos = new ByteArrayOutputStream();
+            objout = new ObjectOutputStream(baos);
+            objout.writeObject(m);
+            ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
+            session.getBasicRemote().sendBinary(bb);
+            baos.flush();
             
         } catch (IOException ex) {
-            log.log(Level.SEVERE, null, ex);
-        } catch (ClassNotFoundException ex) {
-            log.log(Level.SEVERE, null, ex);
-        } 
-        
-        finally{
-            
-                try {
-                    if(bais != null)
-                        bais.close();
-                    
-                    if(obj != null)
-                        obj.close();
-                    
-                    } catch (IOException ex) {
-                        Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-            
-                }// fine finally
-    }
-    /**
-     * The user closes the connection.
-     * 
-     * Note: you can't send messages to the client from this method
-     */
-    @OnClose
-    public void onClose(Session session){
-        log.info("Session " +session.getId()+" has ended");
-        sessions.remove(session);
+            Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 }
