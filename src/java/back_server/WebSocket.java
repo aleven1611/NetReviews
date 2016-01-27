@@ -50,13 +50,12 @@ import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.List;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.inject.Inject;
+import javax.persistence.EntityExistsException;
 import javax.persistence.NoResultException;
-import javax.websocket.EncodeException;
 import javax.websocket.OnClose;
 import javax.websocket.OnMessage;
 import javax.websocket.OnOpen;
@@ -112,8 +111,12 @@ public class WebSocket {
             obj = new ObjectInputStream(bais);
             Message msg = (Message) obj.readObject();
             
-            if(msg.getType().equals("login")){
+            if(msg.getType().equals("Login")){
                 login(objout,baos,session,msg);
+            }
+            
+            if(msg.getType().equals("Registrazione")){
+                registrazione(objout,baos,session,msg);
             }
             
             if(msg.getType().equals("Commento")){
@@ -147,24 +150,39 @@ public class WebSocket {
     
     
     
-    public void login(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session, Message msg){
-        Utente ut=(Utente) msg.getCorpo();
-                log.info("l'utente:"+ut.getMail()+" sta tentando il login.");
-                
-                try {
-                    String pass=gr.findPass(ut.getMail());
-                    if(Login.validatePassword(ut.getPassword(),pass)){
-                        
-                       log.info("Login effettuato correttamente da: "+ut.getMail());
-                       send(objout,baos,session,new Message("ValidateLogin","Login effettuato!"));
-                    }
-                } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
-                    Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
-                } catch(NoResultException e){
-                    send(objout,baos,session,new Message("ErrLogin","User o password errati!"));
-                   
-                }
+    public void login(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message msg) {
+        Utente ut = (Utente) msg.getCorpo();
+        log.info("l'utente:" + ut.getMail() + " sta tentando il login.");
+        try {
+            String pass = gr.findPass(ut.getMail());
+            if (Login.validatePassword(ut.getPassword(), pass)) {
+                log.info("Login effettuato correttamente da: " + ut.getMail());
+                send(objout, baos, session, new Message("ValidateLogin", "Login effettuato!"));
+            }
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
+            Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NoResultException e) {
+            send(objout, baos, session, new Message("ErrLogin", "User o password errati!"));
+
+        }
     }
+    
+      private void registrazione(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message msg) {
+        log.info("Un utente sta tentando la registrazione");
+        Utente ut=(Utente)msg.getCorpo();
+        
+        try{
+            gr.insertUt(ut);
+            log.info("OK, email non presente nel DB utente correttamente registrato");
+            send(objout, baos, session, new Message("MailOk", "Email corretta! Utente registrato"));
+        }
+        catch(EntityExistsException e){
+            log.severe("Attenzione email già presente nel DB!");
+            send(objout, baos, session, new Message("MailErr", "Email già presente nel DB!"));
+        }
+        
+    }
+    
     
     public void findCommenti(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session, Message msg) throws IOException{
         Vector<Commenti> list = (Vector<Commenti>) gr.findCommenti((long)msg.getCorpo());
@@ -183,7 +201,7 @@ public class WebSocket {
               
         }
     
-    //per inviare un oggetto
+    //per inviare un messaggio m su di una sessione
     public void send(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session,Message m){
         try {
             baos = new ByteArrayOutputStream();
@@ -197,4 +215,5 @@ public class WebSocket {
             Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
+
 }

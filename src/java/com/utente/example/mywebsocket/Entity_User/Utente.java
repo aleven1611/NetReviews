@@ -7,6 +7,7 @@ package com.utente.example.mywebsocket.Entity_User;
 
 import java.io.Serializable;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -22,26 +23,27 @@ import javax.swing.ImageIcon;
 public class Utente implements Serializable {
     private static final long serialVersionUID = 1L;
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private long id;
+    
     private String nome;
     private String cognome;
     private String indirizzo;
     private String interessi;
     private String password;
+    private Date data;
+    @Id
     private String mail;
     
     public Utente() {
     }
 
-    public Utente(String nome, String cognome, String indirizzo, String interessi, String password, String mail) {
+    public Utente(String nome, String cognome, String indirizzo, String interessi, String password, String mail,Date data) {
         this.nome = nome;
         this.cognome = cognome;
         this.indirizzo = indirizzo;
         this.interessi = interessi;
         this.password = password;
         this.mail = mail;
+        this.data=data;
     }
     
     public Utente(String mail, String password){
@@ -51,7 +53,7 @@ public class Utente implements Serializable {
 
     @Override
     public String toString() {
-        return "Utente{" + "id=" + id + ", nome=" + nome + ", cognome=" + cognome + ", indirizzo=" + indirizzo + ", interessi=" + interessi + ", password=" + password + ", mail=" + mail + '}';
+        return "Utente{" + ", nome=" + nome + ", cognome=" + cognome + ", indirizzo=" + indirizzo + ", interessi=" + interessi + ", password=" + password + ", mail=" + mail + '}';
     }
 
     @Override
@@ -63,9 +65,7 @@ public class Utente implements Serializable {
             return false;
         }
         final Utente other = (Utente) obj;
-        if (this.id != other.id) {
-            return false;
-        }
+        
         if ((this.nome == null) ? (other.nome != null) : !this.nome.equals(other.nome)) {
             return false;
         }
@@ -108,6 +108,14 @@ public class Utente implements Serializable {
     public String getNome() {
         return nome;
     }
+    
+    public void setData(Date d) {
+        this.data = d; //mail
+    }
+    
+    public Date getData() {
+        return data;
+    }
 
     public void setNome(String nome) {
         this.nome = nome;
@@ -136,18 +144,6 @@ public class Utente implements Serializable {
 
     public void setInteressi(String interessi) {
         this.interessi = interessi;
-    }
-    
-    
-
-    public long getId() {
-        return id;
-    }
-
-    public void setId(long id) {
-        this.id = id;
-    }
-
-   
+    }  
     
 }

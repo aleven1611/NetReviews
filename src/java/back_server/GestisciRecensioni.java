@@ -10,6 +10,7 @@ import com.utente.example.mywebsocket.Entity_User.Commenti;
 import com.utente.example.mywebsocket.Entity_User.Utente;
 import java.util.List;
 import javax.ejb.Stateless;
+import javax.persistence.EntityExistsException;
 import javax.persistence.EntityManager;
 import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
@@ -50,5 +51,15 @@ public class GestisciRecensioni {
         Query q=em.createQuery("Select u From Utente u Where u.mail=:mail");
         q.setParameter("mail", email);
         return ((Utente)q.getSingleResult()).getPassword();
+    }
+    
+    public Integer findEmail(String email) {
+        Query q=em.createQuery("Select u From Utente u Where u.mail=:mail");
+        q.setParameter("mail", email);
+        return (Integer)q.getMaxResults();
+    }
+        
+    public void insertUt(Utente ut) throws EntityExistsException{
+        em.persist(ut);
     }
 }
