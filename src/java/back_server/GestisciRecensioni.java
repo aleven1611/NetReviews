@@ -11,6 +11,7 @@ import com.utente.example.mywebsocket.Entity_User.Utente;
 import java.util.List;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
 
@@ -43,5 +44,11 @@ public class GestisciRecensioni {
         Query q = em.createQuery("Select u From Commenti u");
         
         return q.getResultList();
+    }
+    
+    public String findPass(String email)throws NoResultException{
+        Query q=em.createQuery("Select u From Utente u Where u.mail=:mail");
+        q.setParameter("mail", email);
+        return ((Utente)q.getSingleResult()).getPassword();
     }
 }
