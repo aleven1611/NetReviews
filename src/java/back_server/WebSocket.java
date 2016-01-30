@@ -39,6 +39,7 @@
  */
 package back_server;
 
+import com.mysql.jdbc.exceptions.MySQLIntegrityConstraintViolationException;
 import com.utente.example.mywebsocket.Entity_User.Message;
 import com.utente.example.mywebsocket.Entity_User.Commenti;
 import com.utente.example.mywebsocket.Entity_User.Utente;
@@ -50,106 +51,123 @@ import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Properties;
+import java.util.Timer;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.ejb.Timeout;
 import javax.inject.Inject;
+import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 import javax.persistence.EntityExistsException;
 import javax.persistence.NoResultException;
+import javax.persistence.PersistenceException;
 import javax.websocket.OnClose;
 import javax.websocket.OnMessage;
 import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
-
 /**
  * Echo endpoint.
  *
  * @author Pavel Bucek (pavel.bucek at oracle.com)
  */
-@ServerEndpoint("/echoServer") 
+@ServerEndpoint("/echoServer")
 public class WebSocket {
+
     private static Logger log = Logger.getLogger(WebSocket.class.getName());
     private static Vector<Session> sessions = new Vector<Session>();
-    
+
     @Inject
     private GestisciRecensioni gr;
+
     /**
-     * @OnOpen allows us to intercept the creation of a new session.
-     * The session class allows us to send data to the user.
-     * In the method onOpen, we'll let the user know that the handshake was 
-     * successful.
+     * @OnOpen allows us to intercept the creation of a new session. The session
+     * class allows us to send data to the user. In the method onOpen, we'll let
+     * the user know that the handshake was successful.
      */
     @OnOpen
-    public void onOpen(Session session){
-        log.info(session.getId() + " has opened a connection"); 
-        
-        sessions.add(session);
+    public void onOpen(Session session) {
+        log.info(session.getId() + " has opened a connection");
+        sessions.add(session);       
     }
- 
+
     /**
-     * When a user sends a message to the server, this method will intercept the message
-     * and allow us to react to it. For now the message is read as a String.
+     * When a user sends a message to the server, this method will intercept the
+     * message and allow us to react to it. For now the message is read as a
+     * String.
      */
     @OnMessage
-    public void onMessage(String message, Session session){
+    public void onMessage(String message, Session session) {
         log.info("Message from " + session.getId() + ": " + message);
 
     }
- 
+    
+
     @OnMessage
-    public void onMessage(byte[] buff, Session session){
+    public void onMessage(byte[] buff, Session session) {
         ByteArrayInputStream bais = null;
         ObjectInputStream obj = null;
         ByteArrayOutputStream baos = null;
         ObjectOutputStream objout = null;
         try {
             log.info("Message from " + session.getId() + ": nuovo messaggio");
-            
+
             bais = new ByteArrayInputStream(buff);
             obj = new ObjectInputStream(bais);
             Message msg = (Message) obj.readObject();
-            
-            if(msg.getType().equals("Login")){
-                login(objout,baos,session,msg);
+
+            if (msg.getType().equals("Login")) {
+                login(objout, baos, session, msg);
+            }
+
+            if (msg.getType().equals("Registrazione")) {
+                registrazione(objout, baos, session, msg);
+            }
+
+            if(msg.getType().equals("ReimpostaPass")){
+                log.info("l'utente ha richiesto di reimpostare la password");
+                RandomString rand=new RandomString(7);
+                
+                //testo dell'email
+                String text="Salve, il codice seguente servirà per procedere col modulo di reimposta password."
+                        + " Scrivere questo codice nella sezione reimposta password: "+rand.nextString();
+                sendEmail(objout, baos, session, msg,text,"Reimposta Password");
             }
             
-            if(msg.getType().equals("Registrazione")){
-                registrazione(objout,baos,session,msg);
-            }
-            
-            if(msg.getType().equals("Commento")){
-                System.out.println("vedi: "+((Commenti) msg.getCorpo()).getCommento());
+            if (msg.getType().equals("Commento")) {
+                System.out.println("vedi: " + ((Commenti) msg.getCorpo()).getCommento());
                 gr.addCommenti((Commenti) msg.getCorpo());
             }
-                        
-            if(msg.getType().equals("findCommenti")){
+
+            if (msg.getType().equals("findCommenti")) {
                 try {
-                    findCommenti(objout,baos,session,msg);
+                    findCommenti(objout, baos, session, msg);
                 } catch (IOException ex) {
                     Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
-                }   finally{
+                } finally {
                     objout.close();
                     baos.close();
                 }
             }
-            
+
         } catch (IOException | ClassNotFoundException ex) {
             Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
-            
-        }           
-       }
-   
-        
+
+        }
+    }
+
     @OnClose
-    public void onClose(Session session){
-        log.info("Session " +session.getId()+" has ended");
+    public void onClose(Session session) {
+        log.info("Session " + session.getId() + " has ended");
         sessions.remove(session);
     }
-    
-    
-    
+
     public void login(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message msg) {
         Utente ut = (Utente) msg.getCorpo();
         log.info("l'utente:" + ut.getMail() + " sta tentando il login.");
@@ -162,47 +180,48 @@ public class WebSocket {
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
             Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
         } catch (NoResultException e) {
+            log.severe("User o pass errati!");
             send(objout, baos, session, new Message("ErrLogin", "User o password errati!"));
 
         }
     }
-    
-      private void registrazione(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message msg) {
-        log.info("Un utente sta tentando la registrazione");
-        Utente ut=(Utente)msg.getCorpo();
-        
-        try{
-            gr.insertUt(ut);
-            log.info("OK, email non presente nel DB utente correttamente registrato");
-            send(objout, baos, session, new Message("MailOk", "Email corretta! Utente registrato"));
-        }
-        catch(EntityExistsException e){
-            log.severe("Attenzione email già presente nel DB!");
-            send(objout, baos, session, new Message("MailErr", "Email già presente nel DB!"));
-        }
-        
-    }
-    
-    
-    public void findCommenti(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session, Message msg) throws IOException{
-        Vector<Commenti> list = (Vector<Commenti>) gr.findCommenti((long)msg.getCorpo());
-               
-               baos = new ByteArrayOutputStream();
-               objout = new ObjectOutputStream(baos);
 
-               objout.writeObject(list);
-               System.out.println("list: "+list);
-               
-               ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
-               
-               session.getBasicRemote().sendBinary(bb);
-               
-               baos.flush();
+    private void registrazione(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message msg) {
+        log.info("Un utente sta tentando la registrazione");
+        Utente ut = (Utente) msg.getCorpo();
+
+        if (gr.insertUt(ut)) {
+            log.info("OK, email non presente nel DB utente correttamente registrato");
+            send(objout, baos, session, new Message("RegOk", "Email corretta! Utente registrato"));
+            RandomString rand=new RandomString(7);
+                String text="Salve, il codice seguente servirà per procedere per confermare l'email."
+                        + " Scrivere questo codice nella sezione apposita: "+rand.nextString();
               
+            sendEmail(objout, baos, session, msg,text,"Registrazione");
+        } else {
+            log.severe("Attenzione email già presente nel DB!");
+            send(objout, baos, session, new Message("RegErr", "Email già presente nel DB!"));
         }
-    
+
+    }
+
+    public void findCommenti(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message msg) throws IOException {
+        Vector<Commenti> list = (Vector<Commenti>) gr.findCommenti((long) msg.getCorpo());
+
+        baos = new ByteArrayOutputStream();
+        objout = new ObjectOutputStream(baos);
+        objout.writeObject(list);
+        System.out.println("list: " + list);
+
+        ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
+        session.getBasicRemote().sendBinary(bb);
+
+        baos.flush();
+
+    }
+
     //per inviare un messaggio m su di una sessione
-    public void send(ObjectOutputStream objout,ByteArrayOutputStream baos,Session session,Message m){
+    public void send(ObjectOutputStream objout, ByteArrayOutputStream baos, Session session, Message m) {
         try {
             baos = new ByteArrayOutputStream();
             objout = new ObjectOutputStream(baos);
@@ -210,10 +229,59 @@ public class WebSocket {
             ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
             session.getBasicRemote().sendBinary(bb);
             baos.flush();
-            
+
         } catch (IOException ex) {
             Logger.getLogger(WebSocket.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-}
+    //questo metodo viene invocato sia nella fase di registrazione per inviare il codice per convalidare l'email
+    //sia per procedere con il modulo reimposta password
+    private void sendEmail(ObjectOutputStream objout, ByteArrayOutputStream baos, Session ses, Message msg, String text,String subject) {
+        final String username = "pieroscassacazz@gmail.com";
+        final String password = "Pieronocera93";
+
+        Utente ut = (Utente) msg.getCorpo();
+        
+        Properties props = new Properties();
+        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.socketFactory.port", "465");
+        props.put("mail.smtp.socketFactory.class",
+                "javax.net.ssl.SSLSocketFactory");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.port", "465");
+
+        javax.mail.Session session = javax.mail.Session.getInstance(props,
+                new javax.mail.Authenticator() {
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication(username,password);
+                    }
+                });
+
+        try {
+
+            javax.mail.Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress("pieroscassacazz@gmail.com"));
+            message.setRecipients(javax.mail.Message.RecipientType.TO,
+                    InternetAddress.parse(ut.getMail()));
+            message.setSubject(subject);
+            message.setText(text);
+            Transport.send(message);
+            log.info("email inviata correttamente!");
+            
+            //controllo qui il codice a che cosa dovrà servire: reimposta pass o registrazione
+            if(subject.equalsIgnoreCase("Reimposta Password"))
+                send(objout, baos, ses, new Message("OKRePass", "Email con codice inviata!"));
+            else
+                send(objout, baos, ses, new Message("OKEmailReg", "Email con codice inviata!"));
+
+        } catch (MessagingException e) {
+            log.severe("Attenzione! errore durante intoltro email... ");
+            if(subject.equalsIgnoreCase("Reimposta Password"))
+                send(objout, baos, ses, new Message("ErrRePass", "Errore intoltro email con codice!"));
+            else
+                send(objout, baos, ses, new Message("ErrEmailReg", "Errore intoltro email con codice!"));
+        }
+    }
+    
+}   

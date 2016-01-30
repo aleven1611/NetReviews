@@ -8,12 +8,18 @@ package back_server;
 import com.utente.example.mywebsocket.Entity_Review.Review;
 import com.utente.example.mywebsocket.Entity_User.Commenti;
 import com.utente.example.mywebsocket.Entity_User.Utente;
+import static java.lang.System.load;
+import java.sql.SQLException;
 import java.util.List;
+import java.util.Properties;
+import static java.util.ServiceLoader.load;
+import java.util.logging.Logger;
 import javax.ejb.Stateless;
 import javax.persistence.EntityExistsException;
 import javax.persistence.EntityManager;
 import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
+import javax.persistence.PersistenceException;
 import javax.persistence.Query;
 
 /**
@@ -59,7 +65,15 @@ public class GestisciRecensioni {
         return (Integer)q.getMaxResults();
     }
         
-    public void insertUt(Utente ut) throws EntityExistsException{
-        em.persist(ut);
+    
+    public boolean insertUt(Utente ut){
+      try{
+          em.persist(ut);
+          em.flush();
+          return true;
+      }
+       catch(PersistenceException e){
+           return false;
+       }
     }
 }

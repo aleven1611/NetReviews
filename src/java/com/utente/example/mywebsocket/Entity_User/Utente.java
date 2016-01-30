@@ -13,6 +13,8 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 import javax.swing.ImageIcon;
 
 /**
@@ -23,15 +25,16 @@ import javax.swing.ImageIcon;
 public class Utente implements Serializable {
     private static final long serialVersionUID = 1L;
     
-    
+    @Id
+    private String mail;
     private String nome;
     private String cognome;
     private String indirizzo;
     private String interessi;
     private String password;
+    @Temporal(TemporalType.TIMESTAMP)
     private Date data;
-    @Id
-    private String mail;
+    
     
     public Utente() {
     }
@@ -116,7 +119,7 @@ public class Utente implements Serializable {
     public Date getData() {
         return data;
     }
-
+    
     public void setNome(String nome) {
         this.nome = nome;
     }
