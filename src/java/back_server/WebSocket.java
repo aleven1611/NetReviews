@@ -239,7 +239,7 @@ public class WebSocket {
     //sia per procedere con il modulo reimposta password
     private void sendEmail(ObjectOutputStream objout, ByteArrayOutputStream baos, Session ses, Message msg, String text,String subject) {
         final String username = "pieroscassacazz@gmail.com";
-        final String password = "Pieronocera93";
+        final String password = "provapiero93";
 
         Utente ut = (Utente) msg.getCorpo();
         
